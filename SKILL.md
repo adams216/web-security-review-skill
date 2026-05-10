@@ -3,9 +3,11 @@ name: web-security-review
 description: >
   Perform security reviews of web applications and APIs with evidence-backed findings,
   stack-aware checks, and sprint-ready remediation. Use when auditing a React, Next.js,
-  Vue, Node.js, Express, Django, FastAPI, PHP, WordPress, Docker, or CI/CD codebase
+  Vue, Node.js, Express, Django, FastAPI, PHP, WordPress, Docker, CI/CD, AI agent,
+  MCP, prompt, plugin, or skill codebase
   for vulnerabilities, OWASP coverage, CVEs, threat modeling, secrets exposure,
-  auth or authorization flaws, supply-chain risk, or release readiness.
+  auth or authorization flaws, supply-chain risk, prompt injection, tool exposure,
+  governance gates, or release readiness.
 ---
 
 # Web Security Review
@@ -27,6 +29,7 @@ Think like an AppSec engineer, not a generic code reviewer.
 - `full-audit`: Full threat model, static review, dependency review, infra review, crypto review, and remediation plan.
 - `single-file`: Deep dive one file line by line. Best for auth, payment, upload, and route handlers.
 - `ci-check`: Review Docker, CI, IAM, deployment, and platform config.
+- `ai-agent`: Review prompts, MCP servers, tools, plugins, provider egress, memory, and approval boundaries.
 
 When local execution is allowed, prefer the bundled runners:
 
@@ -92,6 +95,10 @@ Load these references only when needed:
   Use for Django, FastAPI, Pydantic validation, ORM safety, and atomic operations.
 - `references/wordpress-php.md`
   Use for WordPress hardening, PHP input handling, and plugin-related risk.
+- `references/ai-agent-security.md`
+  Use for AI-agent, MCP, prompt, plugin, retrieval, and tool-execution review.
+- `references/governance-gates.md`
+  Use when the review should produce a ship, conditional-ship, or block decision.
 
 ## Reporting rules
 
@@ -117,7 +124,7 @@ Merge findings at the end and deduplicate by exploit path, not by syntax pattern
 ## Bundled scripts
 
 - `scripts/run_audit.py`
-  Main CLI. Supports dry runs, evidence collection, JSON, Markdown, SARIF, and fail thresholds.
+  Main CLI. Supports dry runs, evidence collection, JSON, Markdown, SARIF, fail thresholds, AI-agent mode, and strict governance gating.
 - `scripts/collect_evidence.py`
   Collects local scanner output, inventory data, and redacted secret-scan evidence.
 - `scripts/run-audit.sh`

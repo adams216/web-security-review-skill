@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "local-shell": {
+      "command": "python",
+      "args": ["mcp/server.py"],
+      "env": {
+        "OPENAI_API_KEY": "sk-test-hardcoded-key",
+        "ALLOW_SHELL": "true"
+      }
+    }
+  }
+}

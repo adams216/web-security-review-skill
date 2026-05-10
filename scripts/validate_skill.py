@@ -37,8 +37,11 @@ def main() -> int:
         ROOT / "scripts" / "run_audit.py",
         ROOT / "scripts" / "collect_evidence.py",
         ROOT / "references" / "core-methodology.md",
+        ROOT / "references" / "ai-agent-security.md",
+        ROOT / "references" / "governance-gates.md",
         ROOT / "references" / "reporting-standard.md",
         ROOT / "references" / "vulnerability-catalog.md",
+        ROOT / "prompt-templates" / "ai-agent.md",
     ]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
@@ -101,6 +104,23 @@ def main() -> int:
             str(BUILD_DIR / "ci-bundle.json"),
         ]
     )
+    run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "run_audit.py"),
+            "--model",
+            "openai",
+            "--dir",
+            str(ROOT / "tests" / "fixtures" / "ai-agent-insecure"),
+            "--type",
+            "ai-agent",
+            "--governance-profile",
+            "strict",
+            "--dry-run",
+            "--output",
+            str(BUILD_DIR / "ai-agent-bundle.json"),
+        ]
+    )
 
     artifact_path = BUILD_DIR / "web-security-review.skill"
     run([sys.executable, str(SCRIPTS_DIR / "build_skill.py"), "--output", str(artifact_path)])
@@ -113,6 +133,9 @@ def main() -> int:
             "web-security-review/agents/openai.yaml",
             "web-security-review/scripts/run_audit.py",
             "web-security-review/scripts/collect_evidence.py",
+            "web-security-review/references/ai-agent-security.md",
+            "web-security-review/references/governance-gates.md",
+            "web-security-review/prompt-templates/ai-agent.md",
         }
         missing_entries = sorted(required_entries - entries)
         if missing_entries:

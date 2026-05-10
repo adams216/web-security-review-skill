@@ -89,6 +89,62 @@ CI_NAMES = {
     "bitbucket-pipelines.yml",
 }
 
+AI_AGENT_EXACT_NAMES = {
+    ".mcp.json",
+    "mcp.json",
+    "mcp.yaml",
+    "mcp.yml",
+    "claude_desktop_config.json",
+    "plugin.json",
+    "SKILL.md",
+}
+
+AI_AGENT_DIR_HINTS = {
+    ".claude",
+    ".codex",
+    ".cursor",
+    ".openai",
+    "agents",
+    "mcp",
+    "plugins",
+    "prompts",
+    "skills",
+}
+
+AI_AGENT_NAME_HINTS = (
+    "agent",
+    "assistant",
+    "guardrail",
+    "instruction",
+    "llm",
+    "mcp",
+    "model",
+    "plugin",
+    "policy",
+    "prompt",
+    "skill",
+    "tool",
+)
+
+AI_AGENT_PACKAGE_HINTS = {
+    "@modelcontextprotocol/sdk",
+    "anthropic",
+    "langchain",
+    "langgraph",
+    "modelcontextprotocol",
+    "mcp",
+    "openai",
+    "google-generativeai",
+}
+
+POLICY_NAME_HINTS = (
+    "approval",
+    "guardrail",
+    "permission",
+    "policy",
+    "review",
+)
+
 MAX_SCANNER_OUTPUT_CHARS = 12000
 MAX_SECRET_SCAN_FILE_BYTES = 512 * 1024
 
@@ -129,6 +185,28 @@ def list_repo_files(root: pathlib.Path) -> list[pathlib.Path]:
             continue
         files.append(path)
     return files
+
+
+def is_ai_agent_file(path: pathlib.Path, root: pathlib.Path) -> bool:
+    name = path.name.lower()
+    rel = display_path(path, root).lower()
+    path_parts = {part.lower() for part in path.parts}
+
+    if path.name in AI_AGENT_EXACT_NAMES or name in AI_AGENT_EXACT_NAMES:
+        return True
+    if path_parts & {value.lower() for value in AI_AGENT_DIR_HINTS}:
+        return True
+    if any(hint in name for hint in AI_AGENT_NAME_HINTS):
+        return True
+    if rel.startswith(".github/copilot-instructions"):
+        return True
+    return False
+
+
+def is_policy_file(path: pathlib.Path, root: pathlib.Path) -> bool:
+    rel = display_path(path, root).lower()
+    name = path.name.lower()
+    return any(hint in name or hint in rel for hint in POLICY_NAME_HINTS)
 
 
 def detect_languages(paths: list[pathlib.Path]) -> list[str]:
@@ -179,6 +257,20 @@ def build_inventory(root: pathlib.Path, paths: list[pathlib.Path]) -> dict[str, 
         if any(part in {"k8s", "kubernetes", "helm"} for part in path.parts)
         and path.suffix.lower() in {".yaml", ".yml", ".json", ".tpl"}
     ]
+    ai_agent_files = [display_path(path, root) for path in paths if is_ai_agent_file(path, root)]
+    mcp_files = [
+        display_path(path, root)
+        for path in paths
+        if path.name in AI_AGENT_EXACT_NAMES
+        or path.name.lower() in AI_AGENT_EXACT_NAMES
+        or "mcp" in display_path(path, root).lower()
+    ]
+    prompt_files = [
+        display_path(path, root)
+        for path in paths
+        if "prompt" in path.name.lower() or "/prompts/" in display_path(path, root).lower()
+    ]
+    policy_files = [display_path(path, root) for path in paths if is_policy_file(path, root)]
 
     return {
         "root": str(root),
@@ -189,6 +281,10 @@ def build_inventory(root: pathlib.Path, paths: list[pathlib.Path]) -> dict[str, 
         "docker_files": docker_files,
         "ci_files": ci_files,
         "kubernetes_files": kubernetes_files,
+        "ai_agent_files": ai_agent_files,
+        "mcp_files": mcp_files,
+        "prompt_files": prompt_files,
+        "policy_files": policy_files,
     }
 
 
@@ -226,6 +322,9 @@ def detect_stacks(root: pathlib.Path, paths: list[pathlib.Path]) -> list[str]:
         for path in paths
     ):
         stacks.add("wordpress-php")
+
+    if package_deps & AI_AGENT_PACKAGE_HINTS or any(is_ai_agent_file(path, root) for path in paths):
+        stacks.add("ai-agent-mcp")
 
     return sorted(stacks)
 
@@ -433,7 +532,7 @@ def collect_evidence(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect local security review evidence.")
     parser.add_argument("path", help="Path to the repository or audit target.")
-    parser.add_argument("--audit-type", default="full", help="quick, full, single-file, or ci-check")
+    parser.add_argument("--audit-type", default="full", help="quick, full, single-file, ci-check, or ai-agent")
     parser.add_argument("--file", help="Optional target file for single-file audits.")
     parser.add_argument("--timeout", type=int, default=20, help="Timeout per external scanner command.")
     parser.add_argument(

@@ -119,6 +119,7 @@ PRIORITY_HINTS = (
 )
 
 STACK_REFERENCE_MAP = {
+    "ai-agent-mcp": "ai-agent-security.md",
     "nextjs-react": "nextjs-react.md",
     "nodejs-express": "nodejs-express.md",
     "python-backend": "python-backend.md",
@@ -180,6 +181,16 @@ def score_path(path: pathlib.Path, root: pathlib.Path) -> tuple[int, str]:
     return (-score, rel)
 
 
+def is_ai_agent_focus_file(path: pathlib.Path, root: pathlib.Path) -> bool:
+    rel = display_path(path, root).lower()
+    return (
+        collect_evidence.is_ai_agent_file(path, root)
+        or rel.startswith(".github/workflows/")
+        or any(part.lower() in {"policies", "rules"} for part in path.parts)
+        or any(hint in rel for hint in ("approval", "egress", "memory", "rag", "retrieval"))
+    )
+
+
 def select_paths(
     root: pathlib.Path,
     audit_type: str,
@@ -213,6 +224,20 @@ def select_paths(
                 selected.append(path)
             continue
 
+        if audit_type == "ai-agent":
+            if (
+                is_ai_agent_focus_file(path, root)
+                or path.name in ALWAYS_INCLUDE_NAMES
+                or path.name.startswith("Dockerfile.")
+                or path.suffix.lower() in TEXT_EXTENSIONS
+                and any(
+                    hint in rel.lower()
+                    for hint in ("agent", "prompt", "mcp", "tool", "policy", "guardrail", "llm", "model")
+                )
+            ):
+                selected.append(path)
+            continue
+
         if path.name in ALWAYS_INCLUDE_NAMES or path.name.startswith("Dockerfile."):
             selected.append(path)
             continue
@@ -224,6 +249,10 @@ def select_paths(
 
     if not selected:
         fail(f"no eligible files found under {root} for audit type '{audit_type}'")
+
+    if audit_type == "ai-agent" and not selected:
+        fallback = [path for path in sorted(all_files, key=lambda item: score_path(item, root)) if path.suffix.lower() in TEXT_EXTENSIONS]
+        selected = fallback[:max_files]
 
     return selected[:max_files]
 
@@ -242,10 +271,14 @@ def build_code_blocks(paths: list[pathlib.Path], root: pathlib.Path) -> str:
     return "\n\n".join(parts)
 
 
-def load_references(audit_type: str, detected_stacks: list[str]) -> dict[str, str]:
+def load_references(audit_type: str, detected_stacks: list[str], governance_profile: str) -> dict[str, str]:
     reference_names = ["core-methodology.md", "reporting-standard.md"]
-    if audit_type in {"quick", "full", "single-file"}:
+    if audit_type in {"quick", "full", "single-file", "ai-agent"}:
         reference_names.append("vulnerability-catalog.md")
+    if audit_type == "ai-agent":
+        reference_names.append("ai-agent-security.md")
+    if governance_profile == "strict":
+        reference_names.append("governance-gates.md")
     for stack in detected_stacks:
         filename = STACK_REFERENCE_MAP.get(stack)
         if filename:
@@ -261,6 +294,7 @@ def load_references(audit_type: str, detected_stacks: list[str]) -> dict[str, st
 
 def load_prompt_template(audit_type: str) -> str:
     mapping = {
+        "ai-agent": "ai-agent.md",
         "quick": "quick-scan.md",
         "full": "full-audit.md",
         "single-file": "single-file.md",
@@ -285,7 +319,7 @@ Return ONLY valid JSON matching this structure:
 {
   "metadata": {
     "project_name": "string",
-    "audit_mode": "quick|full|single-file|ci-check"
+    "audit_mode": "quick|full|single-file|ci-check|ai-agent"
   },
   "summary": {
     "overall_risk": "critical|high|medium|low|info",
@@ -347,6 +381,13 @@ Return ONLY valid JSON matching this structure:
     }
   ],
   "positive_findings": ["string"],
+  "governance_gate": {
+    "decision": "approve|approve-with-conditions|block",
+    "release_blockers": ["string"],
+    "required_actions": ["string"],
+    "deferred_risks": ["string"],
+    "notes": "string"
+  },
   "remediation_roadmap": {
     "immediate": ["string"],
     "this_sprint": ["string"],
@@ -361,11 +402,29 @@ Requirements:
 """.strip()
 
 
+def governance_instruction(profile: str) -> str:
+    if profile == "strict":
+        return """
+GOVERNANCE PROFILE: strict
+- Treat this audit as a release gate, not an advisory report.
+- Populate `governance_gate` with a final decision.
+- Use `block` when there is any confirmed Critical or High finding, any committed secret, dangerous tool or shell exposure without guardrails, missing auth or authorization on sensitive surfaces, or untrusted data can reach a powerful tool, provider, or external system.
+- Use `approve-with-conditions` when only Medium or Low findings remain but follow-up work is still required before broad rollout.
+- Put merge-blocking remediation in `release_blockers` and mandatory next steps in `required_actions`.
+""".strip()
+    return """
+GOVERNANCE PROFILE: standard
+- Populate `governance_gate` with a practical decision for engineering teams.
+- Use `approve-with-conditions` when non-blocking follow-up work is still needed.
+""".strip()
+
+
 def build_request_bundle(
     root: pathlib.Path,
     provider: str,
     model_name: str,
     audit_type: str,
+    governance_profile: str,
     output_format: str,
     selected_paths: list[pathlib.Path],
     evidence: dict[str, Any],
@@ -378,6 +437,7 @@ def build_request_bundle(
         "provider": provider,
         "model_name": model_name,
         "audit_type": audit_type,
+        "governance_profile": governance_profile,
         "output_format": output_format,
         "root": str(root),
         "selected_files": [display_path(path, root) for path in selected_paths],
@@ -440,7 +500,35 @@ def highest_confirmed_severity(findings: list[dict[str, Any]]) -> str:
     return highest
 
 
-def normalize_result(raw: dict[str, Any], root: pathlib.Path, audit_type: str, provider: str, model_name: str) -> dict[str, Any]:
+def default_governance_gate(findings: list[dict[str, Any]], governance_profile: str) -> dict[str, Any]:
+    highest = highest_confirmed_severity(findings)
+    if highest in {"critical", "high"}:
+        decision = "block"
+    elif highest in {"medium", "low"}:
+        decision = "approve-with-conditions"
+    else:
+        decision = "approve"
+
+    if governance_profile == "strict" and highest == "medium":
+        decision = "approve-with-conditions"
+
+    return {
+        "decision": decision,
+        "release_blockers": [],
+        "required_actions": [],
+        "deferred_risks": [],
+        "notes": "",
+    }
+
+
+def normalize_result(
+    raw: dict[str, Any],
+    root: pathlib.Path,
+    audit_type: str,
+    provider: str,
+    model_name: str,
+    governance_profile: str,
+) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     for index, finding in enumerate(raw.get("findings") or [], start=1):
         if not isinstance(finding, dict):
@@ -478,12 +566,15 @@ def normalize_result(raw: dict[str, Any], root: pathlib.Path, audit_type: str, p
         overall_risk = highest_confirmed_severity(findings)
 
     metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+    governance_gate = raw.get("governance_gate") if isinstance(raw.get("governance_gate"), dict) else {}
+    default_gate = default_governance_gate(findings, governance_profile)
     result = {
         "metadata": {
             "project_name": metadata.get("project_name") or root.name,
             "audit_mode": metadata.get("audit_mode") or audit_type,
             "provider": provider,
             "model_name": model_name,
+            "governance_profile": governance_profile,
             "generated_at": now_utc(),
         },
         "summary": {
@@ -511,6 +602,19 @@ def normalize_result(raw: dict[str, Any], root: pathlib.Path, audit_type: str, p
         else [],
         "security_headers": raw.get("security_headers") if isinstance(raw.get("security_headers"), list) else [],
         "positive_findings": raw.get("positive_findings") if isinstance(raw.get("positive_findings"), list) else [],
+        "governance_gate": {
+            "decision": str(governance_gate.get("decision") or default_gate["decision"]).lower(),
+            "release_blockers": governance_gate.get("release_blockers")
+            if isinstance(governance_gate.get("release_blockers"), list)
+            else default_gate["release_blockers"],
+            "required_actions": governance_gate.get("required_actions")
+            if isinstance(governance_gate.get("required_actions"), list)
+            else default_gate["required_actions"],
+            "deferred_risks": governance_gate.get("deferred_risks")
+            if isinstance(governance_gate.get("deferred_risks"), list)
+            else default_gate["deferred_risks"],
+            "notes": governance_gate.get("notes") or default_gate["notes"],
+        },
         "remediation_roadmap": raw.get("remediation_roadmap") if isinstance(raw.get("remediation_roadmap"), dict) else {
             "immediate": [],
             "this_sprint": [],
@@ -533,6 +637,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"**Generated:** {metadata['generated_at']}",
         f"**Mode:** {metadata['audit_mode']}",
         f"**Provider:** {metadata['provider']} ({metadata['model_name']})",
+        f"**Governance:** {metadata.get('governance_profile', 'standard')}",
         "",
         "## Executive Summary",
         summary.get("executive_summary") or "No executive summary provided.",
@@ -546,6 +651,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"| Info | {summary['finding_count']['info']} |",
         "",
         f"**Overall Risk:** {summary['overall_risk'].title()}",
+        f"**Gate Decision:** {result.get('governance_gate', {}).get('decision', 'approve-with-conditions').replace('-', ' ').title()}",
         "",
         "## Threat Model",
         "",
@@ -651,6 +757,29 @@ def render_markdown(result: dict[str, Any]) -> str:
     else:
         lines.append("- No positive findings provided.")
 
+    governance_gate = result.get("governance_gate", {})
+    lines.extend(["", "## Governance Gate", "", f"**Decision:** {governance_gate.get('decision', 'approve-with-conditions').replace('-', ' ').title()}"])
+    if governance_gate.get("notes"):
+        lines.extend(["", governance_gate["notes"]])
+
+    lines.extend(["", "**Release Blockers**"])
+    for item in governance_gate.get("release_blockers", []):
+        lines.append(f"- {item}")
+    if not governance_gate.get("release_blockers"):
+        lines.append("- None")
+
+    lines.extend(["", "**Required Actions**"])
+    for item in governance_gate.get("required_actions", []):
+        lines.append(f"- {item}")
+    if not governance_gate.get("required_actions"):
+        lines.append("- None")
+
+    lines.extend(["", "**Deferred Risks**"])
+    for item in governance_gate.get("deferred_risks", []):
+        lines.append(f"- {item}")
+    if not governance_gate.get("deferred_risks"):
+        lines.append("- None")
+
     roadmap = result.get("remediation_roadmap", {})
     lines.extend(["", "## Remediation Roadmap", "", "**Immediate**"])
     for item in roadmap.get("immediate", []):
@@ -737,7 +866,7 @@ def render_sarif(result: dict[str, Any], root: pathlib.Path) -> dict[str, Any]:
                 "tool": {
                     "driver": {
                         "name": "web-security-review",
-                        "version": "0.2.0",
+                        "version": "0.3.0",
                         "informationUri": "https://github.com/adams216/web-security-review-skill",
                         "rules": rules,
                     }
@@ -751,7 +880,12 @@ def render_sarif(result: dict[str, Any], root: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def maybe_fail_threshold(result: dict[str, Any], threshold: str) -> int:
+def maybe_fail_threshold(result: dict[str, Any], threshold: str, governance_profile: str) -> int:
+    decision = str(result.get("governance_gate", {}).get("decision") or "").lower()
+    if governance_profile == "strict" and decision == "block":
+        print("Strict governance gate blocked the review result.", file=sys.stderr)
+        return 2
+
     threshold = normalize_severity(threshold) if threshold != "none" else "none"
     if threshold == "none":
         return 0
@@ -836,11 +970,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", required=True, choices=["claude", "openai", "gemini"], help="Model provider")
     parser.add_argument("--model-name", help="Override the provider-specific model name")
     parser.add_argument("--dir", required=True, help="Repository or project directory")
-    parser.add_argument("--type", default="quick", choices=["quick", "full", "single-file", "ci-check"], help="Audit mode")
+    parser.add_argument("--type", default="quick", choices=["quick", "full", "single-file", "ci-check", "ai-agent"], help="Audit mode")
     parser.add_argument("--file", help="Target file for single-file mode")
     parser.add_argument("--output", default="SECURITY_REPORT.md", help="Output path")
     parser.add_argument("--format", default="markdown", choices=["markdown", "json", "sarif"], help="Output format")
     parser.add_argument("--fail-on", default="none", choices=["none", "low", "medium", "high", "critical"], help="Exit non-zero if findings meet or exceed this severity")
+    parser.add_argument("--governance-profile", default="standard", choices=["standard", "strict"], help="Set the review stance to advisory or release-gate mode")
     parser.add_argument("--max-files", type=int, default=200, help="Maximum number of files to include in the model context")
     parser.add_argument("--dry-run", action="store_true", help="Build the request bundle and skip the model call")
     parser.add_argument("--evidence-out", help="Optional path to write the collected evidence JSON")
@@ -851,18 +986,21 @@ def parse_args() -> argparse.Namespace:
 def default_model_name(provider: str, audit_type: str) -> str:
     defaults = {
         "claude": {
+            "ai-agent": "claude-opus-4-5",
             "quick": "claude-sonnet-4-5",
             "full": "claude-opus-4-5",
             "single-file": "claude-sonnet-4-5",
             "ci-check": "claude-sonnet-4-5",
         },
         "openai": {
+            "ai-agent": "gpt-4o",
             "quick": "gpt-4o-mini",
             "full": "gpt-4o",
             "single-file": "gpt-4o",
             "ci-check": "gpt-4o",
         },
         "gemini": {
+            "ai-agent": "gemini-2.5-pro",
             "quick": "gemini-2.0-flash",
             "full": "gemini-2.5-pro",
             "single-file": "gemini-2.5-flash",
@@ -897,7 +1035,7 @@ def main() -> int:
         write_output(evidence_path, json_dumps(evidence) + "\n")
 
     selected_paths = select_paths(root, args.type, target_file, args.max_files)
-    references = load_references(args.type, evidence.get("stacks", []))
+    references = load_references(args.type, evidence.get("stacks", []), args.governance_profile)
     code_blocks = build_code_blocks(selected_paths, root)
     template = load_prompt_template(args.type)
 
@@ -918,6 +1056,7 @@ def main() -> int:
         [
             template.strip(),
             schema_instruction(),
+            governance_instruction(args.governance_profile),
             "LOCAL EVIDENCE:\n```json\n" + evidence_block + "\n```",
             "SUPPORTING REFERENCES:\n" + reference_block,
             "CODEBASE:\n" + code_blocks,
@@ -935,6 +1074,7 @@ def main() -> int:
             provider=provider,
             model_name=model_name,
             audit_type=args.type,
+            governance_profile=args.governance_profile,
             output_format=args.format,
             selected_paths=selected_paths,
             evidence=evidence,
@@ -948,7 +1088,7 @@ def main() -> int:
 
     raw_response = call_model(provider, model_name, full_system_prompt, user_message)
     parsed = parse_json_response(raw_response)
-    normalized = normalize_result(parsed, root, args.type, provider, model_name)
+    normalized = normalize_result(parsed, root, args.type, provider, model_name, args.governance_profile)
 
     if args.format == "json":
         write_output(output_path, json_dumps(normalized) + "\n")
@@ -959,7 +1099,7 @@ def main() -> int:
         write_output(output_path, render_markdown(normalized))
 
     print(f"Saved report to: {output_path}")
-    return maybe_fail_threshold(normalized, args.fail_on)
+    return maybe_fail_threshold(normalized, args.fail_on, args.governance_profile)
 
 
 if __name__ == "__main__":

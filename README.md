@@ -1,170 +1,243 @@
 # Web Security Review Skill
 
-An engineering-grade security review skill for web applications, APIs, and deployment
-configurations. This repo now ships both:
+[![Release](https://img.shields.io/github/v/release/adams216/web-security-review-skill?display_name=tag)](https://github.com/adams216/web-security-review-skill/releases/latest)
+[![Validate Skill](https://github.com/adams216/web-security-review-skill/actions/workflows/validate-skill.yml/badge.svg)](https://github.com/adams216/web-security-review-skill/actions/workflows/validate-skill.yml)
 
-- source files for maintaining the skill
-- a packaged `.skill` artifact for direct installation or release downloads
+Evidence-backed AI security review for web applications, APIs, and delivery pipelines.
 
-## What is new in v0.2
+This repository ships both a portable `web-security-review.skill` artifact and the full source used to maintain it: prompts, adapters, references, evidence collection, CI validation, and build tooling.
 
-- leaner `SKILL.md` with progressive disclosure
-- dedicated reference files for methodology, vulnerability coverage, and reporting
-- local evidence collection before model inference
-- structured JSON output as the canonical internal format
-- local Markdown and SARIF rendering
-- CI fail thresholds
-- Windows and Unix wrappers
-- build and validation scripts
-- fixture-based dry-run validation in GitHub Actions
+## Why this project exists
 
-## Repository layout
+Most AI security prompts produce vague bug lists. `web-security-review` is designed to produce engineering-grade output that a team can triage and ship against:
 
-```text
-web-security-review-skill/
-|-- SKILL.md
-|-- system-prompt.md
-|-- adapters/
-|-- agents/
-|-- prompt-templates/
-|-- references/
-|-- scripts/
-|   |-- collect_evidence.py
-|   |-- run_audit.py
-|   |-- run-audit.sh
-|   |-- run-audit.ps1
-|   |-- extract-report.py
-|   |-- build_skill.py
-|   `-- validate_skill.py
-|-- tests/
-|   `-- fixtures/
-|-- .github/workflows/validate-skill.yml
-`-- web-security-review.skill
-```
+- threat model first, not isolated bug bingo
+- evidence-backed findings with file and line references
+- `confirmed` versus `suspected` issue separation
+- CWE and CVSS metadata
+- governance gate decisions for stricter review flows
+- AI-agent, MCP, and prompt-surface coverage
+- remediation guidance sized for delivery teams
+- Markdown, JSON, and SARIF output for humans and CI
 
-## Packaged artifact
+## What ships in this repo
 
-The packaged skill is built from source and intentionally excludes repo-only files such as:
+| Component | Purpose |
+| --- | --- |
+| `web-security-review.skill` | Portable packaged artifact for release downloads and installation |
+| `SKILL.md` and `system-prompt.md` | Core review behavior and output contract |
+| `references/` | Methodology, reporting rules, vulnerability catalog, and stack-specific guidance |
+| `adapters/` | Provider-specific prompting for OpenAI, Claude, and Gemini |
+| `scripts/run_audit.py` | Canonical audit CLI |
+| `scripts/collect_evidence.py` | Local evidence gathering and scanner orchestration |
+| `scripts/run-audit.sh` and `scripts/run-audit.ps1` | Thin Unix and Windows wrappers |
+| `prompt-templates/owasp/` | Focused micro-prompts for targeted vulnerability review |
+| `tests/fixtures/` | Intentionally insecure fixtures for dry-run validation |
 
-- `README.md`
-- `tests/`
-- `.github/`
-- `build/`
-- maintenance scripts not needed by end users
+## Installation paths
 
-Build it with:
+Choose the path that fits your workflow.
+
+### Use the packaged release
+
+Download the latest `web-security-review.skill` asset from [Releases](https://github.com/adams216/web-security-review-skill/releases/latest) when you want the portable package.
+
+### Work from source
+
+Clone the repository when you want to customize prompts, adapters, or runner behavior:
 
 ```bash
+git clone https://github.com/adams216/web-security-review-skill.git
+cd web-security-review-skill
 python scripts/build_skill.py
 ```
 
-## Main runners
+The build step regenerates `web-security-review.skill` from source and intentionally excludes repo-only files such as `README.md`, `tests/`, `.github/`, and `build/`.
 
-Use whichever entrypoint fits your environment:
+## Using the skill in Codex
 
-```bash
-python scripts/run_audit.py --model openai --dir ./my-app --type full
-./scripts/run-audit.sh --model claude --dir ./my-app --type quick
-pwsh ./scripts/run-audit.ps1 --model gemini --dir . --type ci-check
+After installing the packaged artifact, prompt Codex with:
+
+```text
+Use $web-security-review to perform an evidence-backed security audit of this web application.
 ```
 
-If Python is not on your PATH, set `PYTHON_BIN` to a concrete interpreter path first.
+## Requirements
 
-Supported audit modes:
+- Python 3.10 or later
+- One provider SDK plus its API key
+- Optional local scanners on `PATH` for richer evidence
 
-- `quick`
-- `full`
-- `single-file`
-- `ci-check`
+Provider setup:
 
-Supported output formats:
+- `openai` with `OPENAI_API_KEY`
+- `anthropic` with `ANTHROPIC_API_KEY`
+- `google-generativeai` with `GOOGLE_API_KEY`
 
-- `markdown`
-- `json`
-- `sarif`
+Install the provider clients:
 
-Useful flags:
+```bash
+python -m pip install openai anthropic google-generativeai
+```
 
-- `--dry-run` to build the request bundle without calling a model
-- `--fail-on high` to fail CI when confirmed findings reach a threshold
-- `--evidence-out evidence.json` to save local evidence separately
-- `--model-name ...` to override the default provider model
+Optional local scanners that the evidence collector will use automatically when present:
 
-## Local evidence collection
+- `npm`, `pnpm`, or `yarn` for JavaScript dependency audits
+- `pip-audit` for Python dependency audits
+- `composer` for PHP dependency audits
+- `govulncheck` for Go dependency audits
+- `trivy` for filesystem, container, and infra scans
 
-The runner uses `scripts/collect_evidence.py` to gather:
+## Quick start
+
+Run a full audit and render a Markdown report:
+
+```bash
+python scripts/run_audit.py --model openai --dir ./my-app --type full --output SECURITY_REPORT.md
+```
+
+Run a deep review of a single file and keep JSON output:
+
+```bash
+python scripts/run_audit.py --model claude --dir ./my-app --type single-file --file src/auth/session.ts --format json --output findings.json
+```
+
+Run a CI and container review that fails the job on High or above:
+
+```bash
+python scripts/run_audit.py --model gemini --dir ./my-app --type ci-check --format sarif --output results.sarif --fail-on high
+```
+
+Run a strict AI-agent and MCP review that behaves like a release gate:
+
+```bash
+python scripts/run_audit.py --model openai --dir ./my-agent --type ai-agent --governance-profile strict --format json --output agent-review.json
+```
+
+Build the prompt bundle without calling a model:
+
+```bash
+python scripts/run_audit.py --model openai --dir ./my-app --type full --dry-run --output bundle.json --evidence-out evidence.json
+```
+
+Wrapper entrypoints are also available:
+
+```bash
+./scripts/run-audit.sh --model openai --dir ./my-app --type quick
+pwsh ./scripts/run-audit.ps1 --model openai --dir ./my-app --type quick
+```
+
+If Python is not on your `PATH`, set `PYTHON_BIN` before using the shell wrappers.
+
+## Audit modes
+
+| Mode | Purpose | Typical use |
+| --- | --- | --- |
+| `quick` | Critical and High issue triage | PR review, pre-merge checks, fast screening |
+| `full` | Full application and platform review | Release readiness, scheduled audits, deeper AppSec review |
+| `single-file` | Line-by-line deep dive of one file | Auth handlers, upload flows, payment code, risky routes |
+| `ci-check` | CI, Docker, and deployment review | Pipeline hardening, supply-chain review, platform checks |
+| `ai-agent` | Prompt, MCP, tool, and provider-boundary review | Agent platforms, tool runners, skills, plugins, prompt packs |
+
+## Output formats
+
+| Format | Use case |
+| --- | --- |
+| `markdown` | Human-readable report for engineers and pull requests |
+| `json` | Canonical machine-readable result for automation and dashboards |
+| `sarif` | Code scanning and CI integrations |
+
+`--fail-on` evaluates the normalized finding severity after the model response is parsed, which makes CI gating deterministic across output formats.
+
+`--governance-profile strict` upgrades the run from an advisory audit to a gate-oriented review with an explicit `approve`, `approve-with-conditions`, or `block` decision.
+
+## How it works
+
+1. `collect_evidence.py` inventories the repo, detects stacks, including AI-agent and MCP surfaces, runs available local scanners, and performs redacted secret discovery.
+2. `run_audit.py` selects the most relevant files for the chosen audit mode.
+3. The runner loads the system prompt, provider adapter, prompt template, and only the references relevant to the detected stack.
+4. The model is asked to return structured JSON, not free-form prose.
+5. The result is normalized and rendered as Markdown, JSON, or SARIF.
+
+This keeps the workflow reproducible and makes downstream automation much easier than parsing ad hoc markdown output.
+
+## Supported stacks and surfaces
+
+Current reference coverage includes:
+
+- Next.js and React
+- Node.js and Express
+- Python backends, including Django and FastAPI-style review patterns
+- WordPress and PHP
+- AI agents, MCP servers, prompt packs, plugins, and tool workflows
+
+The runner also reviews these supporting surfaces when present:
+
+- dependency manifests and lockfiles
+- Dockerfiles and compose files
+- GitHub Actions and other CI configs
+- Kubernetes-shaped manifests
+- Terraform and related infrastructure files
+
+## Evidence collection
+
+The local evidence layer is one of the main differences between this project and a plain prompt pack.
+
+It gathers:
 
 - manifest and lockfile inventory
-- stack detection
+- detected languages and stack hints
 - Docker, CI, and Kubernetes file presence
-- external scanner output when tools are installed
-- redacted secret-scan hits
+- scanner summaries and output excerpts when local tools are installed
+- redacted secret-scan matches
 
-Run it directly if you want the evidence bundle by itself:
+Collected evidence can be saved separately with:
 
 ```bash
 python scripts/collect_evidence.py ./my-app --audit-type full --output evidence.json
 ```
 
-## Structured output model
+## Focused prompt library
 
-The runner asks the model for structured JSON and then renders:
+The packaged skill now also includes smaller deep-dive prompts for targeted review:
 
-- Markdown reports for humans
-- JSON for automation
-- SARIF for code-scanning and CI systems
+- `prompt-templates/owasp/injection.md`
+- `prompt-templates/owasp/auth-and-authorization.md`
+- `prompt-templates/owasp/xss-and-template-injection.md`
+- `prompt-templates/owasp/ssrf-and-egress.md`
+- `prompt-templates/owasp/secrets-and-supply-chain.md`
+- `prompt-templates/governance-gate.md`
 
-This avoids brittle Markdown parsing and makes fail thresholds deterministic.
+These are useful when you want a narrow second-pass review instead of a full repo audit.
 
-## Validation
+## Development workflow
 
-Run the full local validation suite with:
+Validate the repo locally:
 
 ```bash
 python scripts/validate_skill.py
 ```
 
-Validation covers:
-
-- Python syntax checks
-- Bash wrapper syntax
-- dry-run bundles for full, single-file, and CI audit modes
-- clean `.skill` package generation
-- artifact content checks to ensure repo-only files do not leak into the package
-
-GitHub Actions runs the same flow on pushes and pull requests via
-`.github/workflows/validate-skill.yml`.
-
-## Prompt templates
-
-The prompt templates remain useful for direct manual use in model UIs:
-
-- `prompt-templates/quick-scan.md`
-- `prompt-templates/full-audit.md`
-- `prompt-templates/single-file.md`
-- `prompt-templates/ci-check.md`
-
-## Supported stacks
-
-Current stack references cover:
-
-- Next.js and React
-- Node.js and Express
-- Django and FastAPI
-- WordPress and PHP
-
-The runner also reviews Docker, CI, IAM-style policy files, and Terraform-shaped
-infrastructure files when present.
-
-## Release workflow
-
-The tracked `web-security-review.skill` file should be regenerated from source before
-release or push when the packaged contents change:
+Rebuild the packaged artifact:
 
 ```bash
 python scripts/build_skill.py --output web-security-review.skill
 ```
 
+The validation flow checks:
+
+- Python syntax
+- Bash wrapper syntax
+- dry-run bundle generation
+- artifact packaging
+- package-content boundaries so repo-only files do not leak into the `.skill`
+
+GitHub Actions runs the same validation on pushes and pull requests via `.github/workflows/validate-skill.yml`.
+
+## Professional use notes
+
+This project is meant to improve review quality and consistency, not to replace hands-on security testing. Treat `suspected` findings as leads that need runtime validation, and confirm any critical remediation plan against the real architecture before shipping changes.
+
 ## License
 
-MIT. Use freely; attribution is appreciated.
+MIT.
