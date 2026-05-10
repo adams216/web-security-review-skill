@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    privileged: true
+    ports:
+      - "0.0.0.0:3000:3000"
+    environment:
+      AWS_SECRET_ACCESS_KEY: "example-secret"

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+build/
+SECURITY_REPORT.md
+SECURITY_REPORT.json
+SECURITY_REPORT.sarif
+evidence.json

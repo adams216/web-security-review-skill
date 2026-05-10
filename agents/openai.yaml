@@ -1,0 +1,7 @@
+interface:
+  display_name: "Web Security Review"
+  short_description: "Audit web apps for security risks"
+  default_prompt: "Use $web-security-review to perform an evidence-backed security audit of this web application."
+
+policy:
+  allow_implicit_invocation: true

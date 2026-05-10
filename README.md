@@ -1,227 +1,169 @@
 # Web Security Review Skill
 
-An engineering-grade security audit skill for web applications. It works with Claude,
-OpenAI models, and Google Gemini, and it is designed to catch the security issues
-that general coding prompts often miss.
+An engineering-grade security review skill for web applications, APIs, and deployment
+configurations. This repo now ships both:
 
-## What it does
+- source files for maintaining the skill
+- a packaged `.skill` artifact for direct installation or release downloads
 
-Given a web application codebase, this package performs:
+## What is new in v0.2
 
-1. Threat modeling with trust boundaries, entry points, and STRIDE coverage
-2. Static code analysis mapped to OWASP Top 10, CWE IDs, and CVSS v3.1
-3. Dependency and supply-chain review
-4. CI/CD and infrastructure review
-5. Cryptography review
-6. Formal report generation in `SECURITY_REPORT.md`
-7. Inline fixes with attack context and verification steps
+- leaner `SKILL.md` with progressive disclosure
+- dedicated reference files for methodology, vulnerability coverage, and reporting
+- local evidence collection before model inference
+- structured JSON output as the canonical internal format
+- local Markdown and SARIF rendering
+- CI fail thresholds
+- Windows and Unix wrappers
+- build and validation scripts
+- fixture-based dry-run validation in GitHub Actions
 
-## Supported stacks
-
-| Layer | Supported |
-|-------|-----------|
-| Frontend | React, Next.js, Vue, plain HTML/JS |
-| Backend | Node.js/Express, Python (Django, FastAPI), PHP, Go |
-| CMS | WordPress |
-| Infrastructure | Docker, GitHub Actions, GitLab CI, IAM policies |
-| Databases | PostgreSQL, MySQL, MongoDB, Redis |
-
-## Repository structure
+## Repository layout
 
 ```text
-web-security-review/
-|-- README.md
-|-- system-prompt.md
+web-security-review-skill/
 |-- SKILL.md
+|-- system-prompt.md
 |-- adapters/
-|   |-- claude.md
-|   |-- openai.md
-|   `-- gemini.md
+|-- agents/
 |-- prompt-templates/
-|   |-- quick-scan.md
-|   |-- full-audit.md
-|   |-- single-file.md
-|   `-- ci-check.md
 |-- references/
-|   |-- nextjs-react.md
-|   |-- nodejs-express.md
-|   |-- python-backend.md
-|   `-- wordpress-php.md
-`-- scripts/
-    |-- run-audit.sh
-    `-- extract-report.py
+|-- scripts/
+|   |-- collect_evidence.py
+|   |-- run_audit.py
+|   |-- run-audit.sh
+|   |-- run-audit.ps1
+|   |-- extract-report.py
+|   |-- build_skill.py
+|   `-- validate_skill.py
+|-- tests/
+|   `-- fixtures/
+|-- .github/workflows/validate-skill.yml
+`-- web-security-review.skill
 ```
 
-## Prompt templates
+## Packaged artifact
 
-- `prompt-templates/quick-scan.md` for fast PR reviews or pre-commit checks
-- `prompt-templates/full-audit.md` for a full pre-launch audit
-- `prompt-templates/single-file.md` for one-file deep dives
-- `prompt-templates/ci-check.md` for Docker, CI, and infrastructure files
+The packaged skill is built from source and intentionally excludes repo-only files such as:
 
-## CLI runner
+- `README.md`
+- `tests/`
+- `.github/`
+- `build/`
+- maintenance scripts not needed by end users
 
-`scripts/run-audit.sh` bundles the relevant files, picks a template, calls the
-selected provider, and writes the result to `SECURITY_REPORT.md`.
-
-Examples:
+Build it with:
 
 ```bash
-./scripts/run-audit.sh --model claude --dir ./my-project --type quick
-./scripts/run-audit.sh --model openai --dir ./my-project --type full
-./scripts/run-audit.sh --model openai --dir ./my-project --type single-file --file src/auth/login.ts
-./scripts/run-audit.sh --model gemini --dir ./my-project --type ci-check
+python scripts/build_skill.py
 ```
 
-Supported audit types:
+## Main runners
+
+Use whichever entrypoint fits your environment:
+
+```bash
+python scripts/run_audit.py --model openai --dir ./my-app --type full
+./scripts/run-audit.sh --model claude --dir ./my-app --type quick
+pwsh ./scripts/run-audit.ps1 --model gemini --dir . --type ci-check
+```
+
+If Python is not on your PATH, set `PYTHON_BIN` to a concrete interpreter path first.
+
+Supported audit modes:
 
 - `quick`
 - `full`
-- `single-file` (requires `--file`)
+- `single-file`
 - `ci-check`
 
-Provider defaults:
+Supported output formats:
 
-- Claude: `claude-sonnet-4-5` for quick, single-file, and CI checks; `claude-opus-4-5` for full audits
-- OpenAI: `gpt-4o-mini` for quick; `gpt-4o` for full, single-file, and CI checks
-- Gemini: `gemini-2.0-flash` for quick; `gemini-2.5-pro` for full; `gemini-2.5-flash` for single-file and CI checks
+- `markdown`
+- `json`
+- `sarif`
 
-Override the default model with `--model-name <provider-model-id>`.
+Useful flags:
 
-Windows note:
+- `--dry-run` to build the request bundle without calling a model
+- `--fail-on high` to fail CI when confirmed findings reach a threshold
+- `--evidence-out evidence.json` to save local evidence separately
+- `--model-name ...` to override the default provider model
 
-- `run-audit.sh` is a Bash script. Use Git Bash, WSL, or another POSIX shell on Windows.
-- `scripts/extract-report.py` runs fine from PowerShell with `python`.
+## Local evidence collection
 
-## Extracting a clean report
+The runner uses `scripts/collect_evidence.py` to gather:
 
-If a provider returns extra text before the final markdown report, use:
+- manifest and lockfile inventory
+- stack detection
+- Docker, CI, and Kubernetes file presence
+- external scanner output when tools are installed
+- redacted secret-scan hits
+
+Run it directly if you want the evidence bundle by itself:
 
 ```bash
-python scripts/extract-report.py raw-output.txt --output SECURITY_REPORT.md
+python scripts/collect_evidence.py ./my-app --audit-type full --output evidence.json
 ```
 
-The runner already normalizes common fenced-output cases, but this script is useful
-when you want to clean saved raw output manually.
+## Structured output model
 
-## Quick start by model
+The runner asks the model for structured JSON and then renders:
 
-### Claude
+- Markdown reports for humans
+- JSON for automation
+- SARIF for code-scanning and CI systems
 
-Option A:
+This avoids brittle Markdown parsing and makes fail thresholds deterministic.
 
-- Install `web-security-review.skill` directly in your Claude environment
+## Validation
 
-Option B:
+Run the full local validation suite with:
 
-- Copy `system-prompt.md` into the system prompt
-- Use one of the prompt templates from `prompt-templates/`
-
-Option C:
-
-```python
-import anthropic
-
-with open("system-prompt.md") as f:
-    system = f.read()
-
-with open("adapters/claude.md") as f:
-    adapter = f.read()
-
-client = anthropic.Anthropic()
-response = client.messages.create(
-    model="claude-opus-4-5",
-    max_tokens=8096,
-    system=system + "\n\n" + adapter,
-    messages=[{"role": "user", "content": YOUR_CODE_OR_PROMPT}],
-)
+```bash
+python scripts/validate_skill.py
 ```
 
-### OpenAI
+Validation covers:
 
-Option A:
+- Python syntax checks
+- Bash wrapper syntax
+- dry-run bundles for full, single-file, and CI audit modes
+- clean `.skill` package generation
+- artifact content checks to ensure repo-only files do not leak into the package
 
-- Open [OpenAI Playground](https://platform.openai.com/playground)
-- Use Chat mode
-- Paste `system-prompt.md` into the system field
-- Use one of:
-  - `prompt-templates/quick-scan.md`
-  - `prompt-templates/full-audit.md`
-  - `prompt-templates/single-file.md`
-  - `prompt-templates/ci-check.md`
+GitHub Actions runs the same flow on pushes and pull requests via
+`.github/workflows/validate-skill.yml`.
 
-Option B:
+## Prompt templates
 
-```python
-from openai import OpenAI
+The prompt templates remain useful for direct manual use in model UIs:
 
-with open("system-prompt.md") as f:
-    system = f.read()
+- `prompt-templates/quick-scan.md`
+- `prompt-templates/full-audit.md`
+- `prompt-templates/single-file.md`
+- `prompt-templates/ci-check.md`
 
-with open("adapters/openai.md") as f:
-    adapter = f.read()
+## Supported stacks
 
-client = OpenAI()
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {"role": "system", "content": system + "\n\n" + adapter},
-        {"role": "user", "content": YOUR_CODE_OR_PROMPT},
-    ],
-)
+Current stack references cover:
+
+- Next.js and React
+- Node.js and Express
+- Django and FastAPI
+- WordPress and PHP
+
+The runner also reviews Docker, CI, IAM-style policy files, and Terraform-shaped
+infrastructure files when present.
+
+## Release workflow
+
+The tracked `web-security-review.skill` file should be regenerated from source before
+release or push when the packaged contents change:
+
+```bash
+python scripts/build_skill.py --output web-security-review.skill
 ```
-
-### Gemini
-
-Option A:
-
-- Open [Google AI Studio](https://aistudio.google.com)
-- Paste `system-prompt.md` into the system instructions field
-- Use one of the templates from `prompt-templates/`
-
-Option B:
-
-```python
-import google.generativeai as genai
-
-with open("system-prompt.md") as f:
-    system = f.read()
-
-with open("adapters/gemini.md") as f:
-    adapter = f.read()
-
-genai.configure(api_key="YOUR_API_KEY")
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
-    system_instruction=system + "\n\n" + adapter,
-)
-response = model.generate_content(YOUR_CODE_OR_PROMPT)
-```
-
-## Context window tips
-
-| Model | Context limit | Strategy for large codebases |
-|-------|--------------|------------------------------|
-| Claude Opus/Sonnet | 200k tokens | Send core modules first, then infra |
-| GPT-4o | 128k tokens | Split by module and use `single-file` when needed |
-| Gemini 2.x | 1M to 2M tokens | Most repos fit without chunking |
-
-For codebases that exceed the context window, audit in this order:
-
-1. Auth and middleware
-2. API routes and controllers
-3. Database layer
-4. Frontend input handling
-5. Infrastructure files
-
-## Contributing
-
-Good next contributions include:
-
-- new reference files for more stacks
-- more CI examples
-- stronger machine-readable output modes
-- better repo chunking for very large projects
 
 ## License
 
