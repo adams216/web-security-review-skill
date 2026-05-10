@@ -34,7 +34,14 @@ def main() -> int:
         ROOT / "SKILL.md",
         ROOT / "system-prompt.md",
         ROOT / "agents" / "openai.yaml",
+        ROOT / "scripts" / "audit.py",
+        ROOT / "scripts" / "audit.ps1",
+        ROOT / "scripts" / "audit.sh",
+        ROOT / "scripts" / "install.ps1",
+        ROOT / "scripts" / "install.sh",
         ROOT / "scripts" / "run_audit.py",
+        ROOT / "scripts" / "scan.ps1",
+        ROOT / "scripts" / "scan.sh",
         ROOT / "scripts" / "collect_evidence.py",
         ROOT / "references" / "core-methodology.md",
         ROOT / "references" / "ai-agent-security.md",
@@ -55,7 +62,36 @@ def main() -> int:
 
     bash = find_bash()
     if bash:
+        run([bash, "-n", str(SCRIPTS_DIR / "audit.sh")])
+        run([bash, "-n", str(SCRIPTS_DIR / "install.sh")])
         run([bash, "-n", str(SCRIPTS_DIR / "run-audit.sh")])
+        run([bash, "-n", str(SCRIPTS_DIR / "scan.sh")])
+
+    run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "--help"])
+    run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "doctor"])
+    run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "audit.py"),
+            "install",
+            "--dest",
+            str(BUILD_DIR / "test-codex-home" / "skills"),
+        ]
+    )
+    installed_skill = BUILD_DIR / "test-codex-home" / "skills" / "web-security-review" / "SKILL.md"
+    if not installed_skill.exists():
+        raise SystemExit(f"Install shortcut did not create expected skill at: {installed_skill}")
+    run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "audit.py"),
+            "scan",
+            str(ROOT / "tests" / "fixtures" / "node-express-vulnerable"),
+            "--dry-run",
+            "--output",
+            str(BUILD_DIR / "easy-scan-bundle.json"),
+        ]
+    )
 
     run(
         [
@@ -131,6 +167,9 @@ def main() -> int:
             "web-security-review/SKILL.md",
             "web-security-review/system-prompt.md",
             "web-security-review/agents/openai.yaml",
+            "web-security-review/scripts/audit.py",
+            "web-security-review/scripts/audit.sh",
+            "web-security-review/scripts/audit.ps1",
             "web-security-review/scripts/run_audit.py",
             "web-security-review/scripts/collect_evidence.py",
             "web-security-review/references/ai-agent-security.md",

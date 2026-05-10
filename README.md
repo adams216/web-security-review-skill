@@ -28,9 +28,11 @@ Most AI security prompts produce vague bug lists. `web-security-review` is desig
 | `SKILL.md` and `system-prompt.md` | Core review behavior and output contract |
 | `references/` | Methodology, reporting rules, vulnerability catalog, and stack-specific guidance |
 | `adapters/` | Provider-specific prompting for OpenAI, Claude, and Gemini |
+| `scripts/audit.py` | Friendly launcher with short commands for the common paths |
 | `scripts/run_audit.py` | Canonical audit CLI |
 | `scripts/collect_evidence.py` | Local evidence gathering and scanner orchestration |
-| `scripts/run-audit.sh` and `scripts/run-audit.ps1` | Thin Unix and Windows wrappers |
+| `scripts/audit.sh` and `scripts/audit.ps1` | Simple Unix and Windows wrappers for the friendly launcher |
+| `scripts/run-audit.sh` and `scripts/run-audit.ps1` | Thin Unix and Windows wrappers for the advanced CLI |
 | `prompt-templates/owasp/` | Focused micro-prompts for targeted vulnerability review |
 | `tests/fixtures/` | Intentionally insecure fixtures for dry-run validation |
 
@@ -54,12 +56,38 @@ python scripts/build_skill.py
 
 The build step regenerates `web-security-review.skill` from source and intentionally excludes repo-only files such as `README.md`, `tests/`, `.github/`, and `build/`.
 
+## Fastest path from zero
+
+If you just want the shortest path to a first scan:
+
+1. Set one provider key in your shell.
+2. Install the skill into Codex.
+3. Run a quick scan on the current repo.
+
+Windows:
+
+```powershell
+$env:OPENAI_API_KEY="your-key"
+pwsh .\scripts\install.ps1
+pwsh .\scripts\scan.ps1
+```
+
+Cross-platform Python:
+
+```bash
+export OPENAI_API_KEY="your-key"
+python scripts/audit.py install
+python scripts/audit.py scan
+```
+
 ## Using the skill in Codex
 
-After installing the packaged artifact, prompt Codex with:
+After installing the skill, prompt Codex with:
 
 ```text
-Use $web-security-review to perform an evidence-backed security audit of this web application.
+Use $web-security-review for a quick security review of this repo.
+Use $web-security-review for a full audit of this app before release.
+Use $web-security-review in ai-agent mode with strict governance.
 ```
 
 ## Requirements
@@ -90,44 +118,103 @@ Optional local scanners that the evidence collector will use automatically when 
 
 ## Quick start
 
+The easiest commands are:
+
+```bash
+python scripts/audit.py install
+python scripts/audit.py scan
+python scripts/audit.py quick .
+python scripts/audit.py full ./my-app
+python scripts/audit.py ci ./my-app --sarif --fail-on high
+python scripts/audit.py agent ./my-agent --strict
+python scripts/audit.py validate
+python scripts/audit.py doctor
+```
+
+Windows and Unix wrappers are available if you prefer shell-friendly entrypoints:
+
+```bash
+pwsh ./scripts/install.ps1
+pwsh ./scripts/scan.ps1
+pwsh ./scripts/audit.ps1 quick .
+./scripts/audit.sh agent ./my-agent --strict
+```
+
+### Simple command guide
+
+| Command | What it does |
+| --- | --- |
+| `install` | Build and install the skill into Codex automatically |
+| `scan` | One-command quick scan of the current repo |
+| `quick` | Fast high-severity scan |
+| `full` | Full engineering-grade audit |
+| `ci` | CI, Docker, and deployment review |
+| `agent` | AI-agent, MCP, and prompt-surface review |
+| `file <path>` | Deep review of one file |
+| `collect` | Save local evidence without calling a model |
+| `validate` | Run the local validation suite |
+| `build` | Rebuild the packaged `.skill` artifact |
+| `doctor` | Check API keys, scanners, and suggested next commands |
+
+### Examples
+
+Install the skill into the default Codex skills directory:
+
+```bash
+python scripts/audit.py install
+```
+
+Quick-scan the current repo with one command:
+
+```bash
+python scripts/audit.py scan
+```
+
 Run a full audit and render a Markdown report:
 
 ```bash
-python scripts/run_audit.py --model openai --dir ./my-app --type full --output SECURITY_REPORT.md
+python scripts/audit.py full ./my-app
 ```
 
 Run a deep review of a single file and keep JSON output:
 
 ```bash
-python scripts/run_audit.py --model claude --dir ./my-app --type single-file --file src/auth/session.ts --format json --output findings.json
+python scripts/audit.py file src/auth/session.ts ./my-app --provider claude --json --output findings.json
 ```
 
 Run a CI and container review that fails the job on High or above:
 
 ```bash
-python scripts/run_audit.py --model gemini --dir ./my-app --type ci-check --format sarif --output results.sarif --fail-on high
+python scripts/audit.py ci ./my-app --provider gemini --sarif --output results.sarif --fail-on high
 ```
 
 Run a strict AI-agent and MCP review that behaves like a release gate:
 
 ```bash
-python scripts/run_audit.py --model openai --dir ./my-agent --type ai-agent --governance-profile strict --format json --output agent-review.json
+python scripts/audit.py agent ./my-agent --strict --json --output agent-review.json
 ```
 
 Build the prompt bundle without calling a model:
 
 ```bash
-python scripts/run_audit.py --model openai --dir ./my-app --type full --dry-run --output bundle.json --evidence-out evidence.json
+python scripts/audit.py full ./my-app --dry-run --output bundle.json --evidence-out evidence.json
 ```
 
-Wrapper entrypoints are also available:
+Collect local evidence only:
 
 ```bash
-./scripts/run-audit.sh --model openai --dir ./my-app --type quick
-pwsh ./scripts/run-audit.ps1 --model openai --dir ./my-app --type quick
+python scripts/audit.py collect ./my-app --output evidence.json
 ```
 
 If Python is not on your `PATH`, set `PYTHON_BIN` before using the shell wrappers.
+
+### Advanced CLI
+
+If you want the full low-level surface, `scripts/run_audit.py` is still available:
+
+```bash
+python scripts/run_audit.py --model openai --dir ./my-app --type full --output SECURITY_REPORT.md
+```
 
 ## Audit modes
 

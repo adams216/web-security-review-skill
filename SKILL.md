@@ -33,6 +33,9 @@ Think like an AppSec engineer, not a generic code reviewer.
 
 When local execution is allowed, prefer the bundled runners:
 
+- `scripts/audit.py`
+- `scripts/audit.ps1`
+- `scripts/audit.sh`
 - `scripts/run-audit.sh`
 - `scripts/run-audit.ps1`
 - `scripts/run_audit.py`
@@ -123,8 +126,14 @@ Merge findings at the end and deduplicate by exploit path, not by syntax pattern
 
 ## Bundled scripts
 
+- `scripts/audit.py`
+  Friendly launcher with short commands like `quick`, `full`, `ci`, `agent`, `validate`, and `build`.
+- `scripts/audit.ps1`
+  PowerShell wrapper for the friendly launcher.
+- `scripts/audit.sh`
+  Bash wrapper for the friendly launcher.
 - `scripts/run_audit.py`
-  Main CLI. Supports dry runs, evidence collection, JSON, Markdown, SARIF, fail thresholds, AI-agent mode, and strict governance gating.
+  Main advanced CLI. Supports dry runs, evidence collection, JSON, Markdown, SARIF, fail thresholds, AI-agent mode, and strict governance gating.
 - `scripts/collect_evidence.py`
   Collects local scanner output, inventory data, and redacted secret-scan evidence.
 - `scripts/run-audit.sh`

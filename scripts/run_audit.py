@@ -866,7 +866,7 @@ def render_sarif(result: dict[str, Any], root: pathlib.Path) -> dict[str, Any]:
                 "tool": {
                     "driver": {
                         "name": "web-security-review",
-                        "version": "0.3.0",
+                        "version": "0.3.1",
                         "informationUri": "https://github.com/adams216/web-security-review-skill",
                         "rules": rules,
                     }

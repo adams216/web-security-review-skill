@@ -18,6 +18,9 @@ PACKAGE_PATHS = [
     "assets",
     "prompt-templates",
     "references",
+    "scripts/audit.py",
+    "scripts/audit.sh",
+    "scripts/audit.ps1",
     "scripts/collect_evidence.py",
     "scripts/extract-report.py",
     "scripts/run_audit.py",
@@ -76,4 +79,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
