@@ -80,6 +80,64 @@ python scripts/audit.py install
 python scripts/audit.py scan
 ```
 
+## Native host installs
+
+### Codex
+
+Install into your Codex user skills directory:
+
+```powershell
+python .\scripts\audit.py install
+```
+
+Then use it in Codex with:
+
+```text
+Use $web-security-review for a quick security review of this repo.
+```
+
+### Claude Code
+
+This repo now includes a Claude Code marketplace manifest at [.claude-plugin/marketplace.json](</C:/Users/adamb/Desktop/skills/web-security-review-skill/.claude-plugin/marketplace.json>).
+
+Add the repo as a marketplace in Claude Code:
+
+```text
+/plugin marketplace add adams216/web-security-review-skill
+```
+
+Install the plugin directly:
+
+```text
+/plugin install web-security-review@adams216-security-skills
+```
+
+Then use it in Claude Code by asking for the skill naturally, for example:
+
+```text
+Use the web-security-review skill to run a full security audit on this repo.
+```
+
+### Gemini CLI
+
+Install from GitHub:
+
+```bash
+gemini skills install https://github.com/adams216/web-security-review-skill.git --consent
+```
+
+Or install from a local checkout:
+
+```bash
+gemini skills install C:\Users\adamb\Desktop\skills\web-security-review-skill --consent
+```
+
+Then use it in Gemini CLI, for example:
+
+```text
+Use the web-security-review skill to review this repo for security issues.
+```
+
 ## Using the skill in Codex
 
 After installing the skill, prompt Codex with:

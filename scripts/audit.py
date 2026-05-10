@@ -289,6 +289,9 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     print("  - python scripts/audit.py validate")
     print("  - pwsh ./scripts/install.ps1")
     print("  - pwsh ./scripts/scan.ps1")
+    print("  - Claude Code: /plugin marketplace add adams216/web-security-review-skill")
+    print("  - Claude Code: /plugin install web-security-review@adams216-security-skills")
+    print("  - Gemini CLI: gemini skills install https://github.com/adams216/web-security-review-skill.git --consent")
     return 0
 
 

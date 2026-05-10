@@ -1,0 +1,22 @@
+{
+  "name": "adams216-security-skills",
+  "owner": {
+    "name": "adams216",
+    "email": "adams216@users.noreply.github.com"
+  },
+  "metadata": {
+    "description": "Security review skills for web apps, AI agents, MCP workflows, and CI pipelines",
+    "version": "0.3.2"
+  },
+  "plugins": [
+    {
+      "name": "web-security-review",
+      "description": "Evidence-backed security review for web applications, AI agents, MCP workflows, and delivery pipelines",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./"
+      ]
+    }
+  ]
+}

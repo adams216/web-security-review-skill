@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 import py_compile
 import shutil
@@ -33,6 +34,7 @@ def main() -> int:
     required = [
         ROOT / "SKILL.md",
         ROOT / "system-prompt.md",
+        ROOT / ".claude-plugin" / "marketplace.json",
         ROOT / "agents" / "openai.yaml",
         ROOT / "scripts" / "audit.py",
         ROOT / "scripts" / "audit.ps1",
@@ -53,6 +55,11 @@ def main() -> int:
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise SystemExit("Missing required files:\n" + "\n".join(missing))
+
+    with (ROOT / ".claude-plugin" / "marketplace.json").open("r", encoding="utf-8") as handle:
+        marketplace = json.load(handle)
+    if not marketplace.get("plugins"):
+        raise SystemExit(".claude-plugin/marketplace.json must define at least one plugin entry")
 
     for python_file in sorted(SCRIPTS_DIR.glob("*.py")):
         pyc_dir = BUILD_DIR / "pyc"
