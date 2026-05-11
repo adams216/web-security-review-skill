@@ -61,15 +61,15 @@ The build step regenerates `web-security-review.skill` from source and intention
 If you just want the shortest path to a first scan:
 
 1. Set one provider key in your shell.
-2. Install the skill into Codex.
+2. Install the skill into Codex or Gemini.
 3. Run a quick scan on the current repo.
 
 Windows:
 
 ```powershell
 $env:OPENAI_API_KEY="your-key"
-pwsh .\scripts\install.ps1
-pwsh .\scripts\scan.ps1
+.\scripts\install.ps1
+.\scripts\scan.ps1
 ```
 
 Cross-platform Python:
@@ -78,6 +78,12 @@ Cross-platform Python:
 export OPENAI_API_KEY="your-key"
 python scripts/audit.py install
 python scripts/audit.py scan
+```
+
+Gemini local user-scope install:
+
+```bash
+python scripts/audit.py install --host gemini
 ```
 
 ## Native host installs
@@ -119,6 +125,33 @@ Use the web-security-review skill to run a full security audit on this repo.
 ```
 
 ### Gemini CLI
+
+Install into your local Gemini user skills directory with the friendly helper:
+
+```bash
+python scripts/audit.py install --host gemini
+```
+
+Or use the dedicated wrappers:
+
+```bash
+.\scripts\install-gemini.ps1
+./scripts/install-gemini.sh
+```
+
+Install into a workspace-local Gemini skills folder instead:
+
+```bash
+python scripts/audit.py install --host gemini --scope workspace --workspace-root /path/to/workspace
+```
+
+Use the shared `.agents/skills` alias if you want the interoperable path:
+
+```bash
+python scripts/audit.py install --host gemini --layout agents
+```
+
+You can still use Gemini CLI's native install command when you prefer repository-based installation:
 
 Install from GitHub:
 
@@ -180,6 +213,7 @@ The easiest commands are:
 
 ```bash
 python scripts/audit.py install
+python scripts/audit.py install --host gemini
 python scripts/audit.py scan
 python scripts/audit.py quick .
 python scripts/audit.py full ./my-app
@@ -192,9 +226,10 @@ python scripts/audit.py doctor
 Windows and Unix wrappers are available if you prefer shell-friendly entrypoints:
 
 ```bash
-pwsh ./scripts/install.ps1
-pwsh ./scripts/scan.ps1
-pwsh ./scripts/audit.ps1 quick .
+.\scripts\install.ps1
+.\scripts\install-gemini.ps1
+.\scripts\scan.ps1
+.\scripts\audit.ps1 quick .
 ./scripts/audit.sh agent ./my-agent --strict
 ```
 
@@ -202,7 +237,7 @@ pwsh ./scripts/audit.ps1 quick .
 
 | Command | What it does |
 | --- | --- |
-| `install` | Build and install the skill into Codex automatically |
+| `install` | Build and install the skill into Codex or Gemini automatically |
 | `scan` | One-command quick scan of the current repo |
 | `quick` | Fast high-severity scan |
 | `full` | Full engineering-grade audit |
@@ -220,6 +255,12 @@ Install the skill into the default Codex skills directory:
 
 ```bash
 python scripts/audit.py install
+```
+
+Install the skill into the default Gemini user skills directory:
+
+```bash
+python scripts/audit.py install --host gemini
 ```
 
 Quick-scan the current repo with one command:

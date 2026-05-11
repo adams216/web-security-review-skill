@@ -10,7 +10,7 @@ if ($env:PYTHON_BIN) {
   $candidates += $env:PYTHON_BIN
 }
 
-$candidates += @("python", "py")
+$candidates += @("py", "python")
 
 $pythonCmd = $null
 foreach ($candidate in $candidates) {

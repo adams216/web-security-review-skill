@@ -28,6 +28,14 @@ def find_bash() -> str | None:
     return None
 
 
+def find_powershell() -> str | None:
+    for candidate in ("pwsh", "powershell"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return None
+
+
 def main() -> int:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -39,6 +47,8 @@ def main() -> int:
         ROOT / "scripts" / "audit.py",
         ROOT / "scripts" / "audit.ps1",
         ROOT / "scripts" / "audit.sh",
+        ROOT / "scripts" / "install-gemini.ps1",
+        ROOT / "scripts" / "install-gemini.sh",
         ROOT / "scripts" / "install.ps1",
         ROOT / "scripts" / "install.sh",
         ROOT / "scripts" / "run_audit.py",
@@ -70,9 +80,11 @@ def main() -> int:
     bash = find_bash()
     if bash:
         run([bash, "-n", str(SCRIPTS_DIR / "audit.sh")])
+        run([bash, "-n", str(SCRIPTS_DIR / "install-gemini.sh")])
         run([bash, "-n", str(SCRIPTS_DIR / "install.sh")])
         run([bash, "-n", str(SCRIPTS_DIR / "run-audit.sh")])
         run([bash, "-n", str(SCRIPTS_DIR / "scan.sh")])
+    powershell = find_powershell()
 
     run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "--help"])
     run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "doctor"])
@@ -88,6 +100,71 @@ def main() -> int:
     installed_skill = BUILD_DIR / "test-codex-home" / "skills" / "web-security-review" / "SKILL.md"
     if not installed_skill.exists():
         raise SystemExit(f"Install shortcut did not create expected skill at: {installed_skill}")
+    gemini_user_dir = BUILD_DIR / "test-gemini-home" / ".gemini" / "skills"
+    run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "audit.py"),
+            "install",
+            "--host",
+            "gemini",
+            "--dest",
+            str(gemini_user_dir),
+        ]
+    )
+    gemini_user_skill = gemini_user_dir / "web-security-review" / "SKILL.md"
+    if not gemini_user_skill.exists():
+        raise SystemExit(f"Gemini user install did not create expected skill at: {gemini_user_skill}")
+    gemini_workspace_root = BUILD_DIR / "gemini-workspace"
+    run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "audit.py"),
+            "install",
+            "--host",
+            "gemini",
+            "--scope",
+            "workspace",
+            "--layout",
+            "agents",
+            "--workspace-root",
+            str(gemini_workspace_root),
+        ]
+    )
+    gemini_workspace_skill = gemini_workspace_root / ".agents" / "skills" / "web-security-review" / "SKILL.md"
+    if not gemini_workspace_skill.exists():
+        raise SystemExit(f"Gemini workspace install did not create expected skill at: {gemini_workspace_skill}")
+    if powershell:
+        ps_codex_dir = BUILD_DIR / "test-codex-home-ps" / "skills"
+        run(
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                str(SCRIPTS_DIR / "install.ps1"),
+                "--dest",
+                str(ps_codex_dir),
+            ]
+        )
+        ps_codex_skill = ps_codex_dir / "web-security-review" / "SKILL.md"
+        if not ps_codex_skill.exists():
+            raise SystemExit(f"PowerShell Codex install did not create expected skill at: {ps_codex_skill}")
+        ps_gemini_dir = BUILD_DIR / "test-gemini-home-ps" / ".gemini" / "skills"
+        run(
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                str(SCRIPTS_DIR / "install-gemini.ps1"),
+                "--dest",
+                str(ps_gemini_dir),
+            ]
+        )
+        ps_gemini_skill = ps_gemini_dir / "web-security-review" / "SKILL.md"
+        if not ps_gemini_skill.exists():
+            raise SystemExit(f"PowerShell Gemini install did not create expected skill at: {ps_gemini_skill}")
     run(
         [
             sys.executable,

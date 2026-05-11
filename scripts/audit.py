@@ -13,6 +13,8 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
+HOST_CHOICES = ("codex", "gemini")
+GEMINI_LAYOUT_CHOICES = ("native", "agents")
 
 PROVIDER_ALIASES = {
     "anthropic": "claude",
@@ -101,6 +103,14 @@ def codex_home() -> pathlib.Path:
     if configured:
         return pathlib.Path(configured).expanduser().resolve()
     return (pathlib.Path.home() / ".codex").resolve()
+
+
+def gemini_skills_dir(scope: str, layout: str, workspace_root: pathlib.Path | None = None) -> pathlib.Path:
+    container = ".agents" if layout == "agents" else ".gemini"
+    if scope == "user":
+        return (pathlib.Path.home() / container / "skills").resolve()
+    root = workspace_root.resolve() if workspace_root else pathlib.Path.cwd().resolve()
+    return (root / container / "skills").resolve()
 
 
 def ensure_within(parent: pathlib.Path, child: pathlib.Path) -> None:
@@ -240,7 +250,21 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_install(args: argparse.Namespace) -> int:
-    skills_dir = pathlib.Path(args.dest).expanduser().resolve() if args.dest else codex_home() / "skills"
+    host = args.host
+    if host == "codex":
+        if args.scope != "user":
+            raise SystemExit("Codex installs only support user scope. Omit --scope or use --scope user.")
+        if args.workspace_root:
+            raise SystemExit("--workspace-root is only supported for Gemini workspace installs.")
+        if args.layout is not None:
+            raise SystemExit("--layout is only supported for Gemini installs.")
+    workspace_root = pathlib.Path(args.workspace_root).expanduser().resolve() if args.workspace_root else None
+    layout = args.layout or "native"
+    skills_dir = pathlib.Path(args.dest).expanduser().resolve() if args.dest else (
+        codex_home() / "skills"
+        if host == "codex"
+        else gemini_skills_dir(args.scope, layout, workspace_root=workspace_root)
+    )
     skills_dir.mkdir(parents=True, exist_ok=True)
 
     if args.artifact:
@@ -261,8 +285,21 @@ def cmd_install(args: argparse.Namespace) -> int:
 
     safe_extract(artifact_path, skills_dir)
     print(f"Installed web-security-review to: {install_target}")
-    print("Try it in Codex with:")
-    print("  Use $web-security-review for a quick security review of this repo.")
+    if host == "codex":
+        print("Try it in Codex with:")
+        print("  Use $web-security-review for a quick security review of this repo.")
+        return 0
+
+    location_label = ".agents/skills" if layout == "agents" else ".gemini/skills"
+    print(f"Gemini install scope: {args.scope} ({location_label})")
+    if args.scope == "workspace":
+        print("If Gemini CLI does not show the skill yet, trust the workspace if needed and run /skills reload.")
+    else:
+        print("If Gemini CLI is already running, use /skills reload to refresh discovered skills.")
+    print("Try it in Gemini CLI with:")
+    print("  /skills list")
+    print("  /skills reload")
+    print("  Use the web-security-review skill to review this repo for security issues.")
     return 0
 
 
@@ -272,6 +309,10 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     print(f"- Python: {sys.executable}")
     print(f"- Repo: {ROOT}")
     print(f"- Codex home: {codex_home()}")
+    print(f"- Gemini user skills (.gemini): {gemini_skills_dir('user', 'native')}")
+    print(f"- Gemini user skills (.agents): {gemini_skills_dir('user', 'agents')}")
+    print(f"- Gemini workspace skills (.gemini): {gemini_skills_dir('workspace', 'native')}")
+    print(f"- Gemini workspace skills (.agents): {gemini_skills_dir('workspace', 'agents')}")
     print(f"- Detected provider: {provider or 'none'}")
     print(f"- OPENAI_API_KEY: {'set' if os.environ.get('OPENAI_API_KEY') else 'missing'}")
     print(f"- ANTHROPIC_API_KEY: {'set' if os.environ.get('ANTHROPIC_API_KEY') else 'missing'}")
@@ -282,13 +323,17 @@ def cmd_doctor(_: argparse.Namespace) -> int:
         print(f"  - {tool}: {'found' if status else 'missing'}")
     print("- Try one of these:")
     print("  - python scripts/audit.py install")
+    print("  - python scripts/audit.py install --host gemini")
+    print("  - python scripts/audit.py install --host gemini --layout agents")
+    print("  - python scripts/audit.py install --host gemini --scope workspace")
     print("  - python scripts/audit.py scan")
     print("  - python scripts/audit.py quick .")
     print("  - python scripts/audit.py full .")
     print("  - python scripts/audit.py agent . --strict")
     print("  - python scripts/audit.py validate")
-    print("  - pwsh ./scripts/install.ps1")
-    print("  - pwsh ./scripts/scan.ps1")
+    print(r"  - powershell -File .\scripts\install.ps1")
+    print(r"  - powershell -File .\scripts\install-gemini.ps1")
+    print(r"  - powershell -File .\scripts\scan.ps1")
     print("  - Claude Code: /plugin marketplace add adams216/web-security-review-skill")
     print("  - Claude Code: /plugin install web-security-review@adams216-security-skills")
     print("  - Gemini CLI: gemini skills install https://github.com/adams216/web-security-review-skill.git --consent")
@@ -298,7 +343,7 @@ def cmd_doctor(_: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Friendly launcher for the web-security-review skill.",
-        epilog="Examples: audit.py install | audit.py scan | audit.py agent . --strict | audit.py validate",
+        epilog="Examples: audit.py install | audit.py install --host gemini | audit.py scan | audit.py agent . --strict | audit.py validate",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -338,9 +383,20 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--output", help="Optional output path for the built .skill artifact.")
     build.set_defaults(func=cmd_build)
 
-    install = subparsers.add_parser("install", help="Build and install the skill into Codex's skills directory.")
+    install = subparsers.add_parser("install", help="Build and install the skill into Codex or Gemini skill directories.")
     install.add_argument("--artifact", help="Optional existing .skill file to install. Defaults to building from current source.")
-    install.add_argument("--dest", help="Optional skills directory. Defaults to $CODEX_HOME/skills or ~/.codex/skills.")
+    install.add_argument("--dest", help="Optional skills directory. Overrides the host-specific default install location.")
+    install.add_argument("--host", choices=HOST_CHOICES, default="codex", help="Install target. Defaults to codex.")
+    install.add_argument("--scope", choices=["user", "workspace"], default="user", help="For Gemini installs, choose user or workspace scope.")
+    install.add_argument(
+        "--layout",
+        choices=GEMINI_LAYOUT_CHOICES,
+        help="For Gemini installs, choose the standard .gemini/skills path or the interoperable .agents/skills alias.",
+    )
+    install.add_argument(
+        "--workspace-root",
+        help="For Gemini workspace installs, choose the workspace root. Defaults to the current working directory.",
+    )
     install.set_defaults(func=cmd_install)
 
     doctor = subparsers.add_parser("doctor", help="Check provider keys, scanner availability, and quick-start commands.")
