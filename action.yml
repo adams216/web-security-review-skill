@@ -1,0 +1,73 @@
+name: Web Security Review
+description: Evidence-backed AI security review for web apps, CI/CD, and AI-agent surfaces.
+
+inputs:
+  mode:
+    description: Audit mode: quick, full, ci, agent, or collect.
+    required: false
+    default: ci
+  path:
+    description: Repository or directory to review.
+    required: false
+    default: .
+  provider:
+    description: Provider override: openai, claude, or gemini. Defaults to API-key auto-detection.
+    required: false
+    default: ""
+  output:
+    description: Output path.
+    required: false
+    default: security-results.sarif
+  format:
+    description: Output format: markdown, json, or sarif.
+    required: false
+    default: sarif
+  fail-on:
+    description: Fail threshold: none, low, medium, high, or critical.
+    required: false
+    default: high
+  strict:
+    description: Use strict governance gating for agent reviews.
+    required: false
+    default: "false"
+  install-provider-sdks:
+    description: Install OpenAI, Anthropic, and Gemini Python SDKs before running.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install provider SDKs
+      if: ${{ inputs.install-provider-sdks == 'true' }}
+      shell: bash
+      run: python -m pip install --upgrade openai anthropic google-generativeai
+
+    - name: Run security review
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        mode="${{ inputs.mode }}"
+        case "$mode" in
+          quick|full|ci|agent|collect)
+            ;;
+          *)
+            echo "Unsupported mode: $mode" >&2
+            exit 1
+            ;;
+        esac
+
+        args=("$mode" "${{ inputs.path }}" "--output" "${{ inputs.output }}")
+
+        if [[ "$mode" != "collect" ]]; then
+          args+=("--format" "${{ inputs.format }}" "--fail-on" "${{ inputs.fail-on }}")
+          if [[ -n "${{ inputs.provider }}" ]]; then
+            args+=("--provider" "${{ inputs.provider }}")
+          fi
+          if [[ "${{ inputs.strict }}" == "true" ]]; then
+            args+=("--strict")
+          fi
+        fi
+
+        python "$GITHUB_ACTION_PATH/scripts/audit.py" "${args[@]}"

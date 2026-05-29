@@ -127,7 +127,7 @@ Merge findings at the end and deduplicate by exploit path, not by syntax pattern
 ## Bundled scripts
 
 - `scripts/audit.py`
-  Friendly launcher with short commands like `install`, `quick`, `full`, `ci`, `agent`, `validate`, and `build`, including host-aware installs for Codex and Gemini.
+  Friendly launcher with short commands like `setup`, `install`, `quick`, `full`, `ci`, `agent`, `validate`, and `build`, including host-aware installs for Codex and Gemini.
 - `scripts/audit.ps1`
   PowerShell wrapper for the friendly launcher.
 - `scripts/audit.sh`

@@ -42,6 +42,11 @@ def main() -> int:
     required = [
         ROOT / "SKILL.md",
         ROOT / "system-prompt.md",
+        ROOT / "install.ps1",
+        ROOT / "install.sh",
+        ROOT / "wsr",
+        ROOT / "wsr.ps1",
+        ROOT / "action.yml",
         ROOT / ".claude-plugin" / "marketplace.json",
         ROOT / "agents" / "openai.yaml",
         ROOT / "scripts" / "audit.py",
@@ -70,6 +75,10 @@ def main() -> int:
         marketplace = json.load(handle)
     if not marketplace.get("plugins"):
         raise SystemExit(".claude-plugin/marketplace.json must define at least one plugin entry")
+    action_text = (ROOT / "action.yml").read_text(encoding="utf-8")
+    for required_text in ("using: composite", "scripts/audit.py", "fail-on"):
+        if required_text not in action_text:
+            raise SystemExit(f"action.yml is missing expected content: {required_text}")
 
     for python_file in sorted(SCRIPTS_DIR.glob("*.py")):
         pyc_dir = BUILD_DIR / "pyc"
@@ -79,6 +88,8 @@ def main() -> int:
 
     bash = find_bash()
     if bash:
+        run([bash, "-n", str(ROOT / "install.sh")])
+        run([bash, "-n", str(ROOT / "wsr")])
         run([bash, "-n", str(SCRIPTS_DIR / "audit.sh")])
         run([bash, "-n", str(SCRIPTS_DIR / "install-gemini.sh")])
         run([bash, "-n", str(SCRIPTS_DIR / "install.sh")])
@@ -88,6 +99,10 @@ def main() -> int:
 
     run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "--help"])
     run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "doctor"])
+    run([sys.executable, str(SCRIPTS_DIR / "audit.py"), "setup", "--dest", str(BUILD_DIR / "test-setup-home" / "skills")])
+    setup_skill = BUILD_DIR / "test-setup-home" / "skills" / "web-security-review" / "SKILL.md"
+    if not setup_skill.exists():
+        raise SystemExit(f"Setup shortcut did not create expected skill at: {setup_skill}")
     run(
         [
             sys.executable,
@@ -135,6 +150,39 @@ def main() -> int:
     if not gemini_workspace_skill.exists():
         raise SystemExit(f"Gemini workspace install did not create expected skill at: {gemini_workspace_skill}")
     if powershell:
+        ps_root_codex_dir = BUILD_DIR / "test-root-codex-ps" / "skills"
+        run(
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                str(ROOT / "install.ps1"),
+                "-Dest",
+                str(ps_root_codex_dir),
+            ]
+        )
+        ps_root_codex_skill = ps_root_codex_dir / "web-security-review" / "SKILL.md"
+        if not ps_root_codex_skill.exists():
+            raise SystemExit(f"Root PowerShell install did not create expected skill at: {ps_root_codex_skill}")
+        ps_root_gemini_dir = BUILD_DIR / "test-root-gemini-ps" / ".gemini" / "skills"
+        run(
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                str(ROOT / "install.ps1"),
+                "-Host",
+                "gemini",
+                "-Dest",
+                str(ps_root_gemini_dir),
+            ]
+        )
+        ps_root_gemini_skill = ps_root_gemini_dir / "web-security-review" / "SKILL.md"
+        if not ps_root_gemini_skill.exists():
+            raise SystemExit(f"Root PowerShell Gemini install did not create expected skill at: {ps_root_gemini_skill}")
+        run([powershell, "-NoLogo", "-NoProfile", "-File", str(ROOT / "wsr.ps1"), "doctor"])
         ps_codex_dir = BUILD_DIR / "test-codex-home-ps" / "skills"
         run(
             [
@@ -268,6 +316,7 @@ def main() -> int:
             "web-security-review/tests/",
             "web-security-review/.github/",
             "web-security-review/build/",
+            "web-security-review/action.yml",
         )
         forbidden = sorted(entry for entry in entries if entry.startswith(forbidden_prefixes))
         if forbidden:
