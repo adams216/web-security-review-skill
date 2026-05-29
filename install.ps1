@@ -39,11 +39,6 @@ if ($localAudit -and (Test-Path $localAudit)) {
   exit $LASTEXITCODE
 }
 
-if ($HostName -eq "codex" -and $Scope -ne "user") {
-  Write-Error "Codex installs only support user scope."
-  exit 1
-}
-
 $skillUrl = "https://github.com/adams216/web-security-review-skill/releases/latest/download/web-security-review.skill"
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("web-security-review-" + [System.Guid]::NewGuid().ToString("N"))
 $artifact = Join-Path $tempRoot "web-security-review.skill"
@@ -57,9 +52,12 @@ try {
   if ($Dest) {
     $destItem = New-Item -ItemType Directory -Force -Path $Dest
     $skillsDir = [System.IO.Path]::GetFullPath($destItem.FullName)
-  } elseif ($HostName -eq "codex") {
+  } elseif ($HostName -eq "codex" -and $Scope -eq "user") {
     $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
     $skillsDir = Join-Path $codexHome "skills"
+  } elseif ($HostName -eq "codex") {
+    $root = if ($WorkspaceRoot) { $WorkspaceRoot } else { (Get-Location).Path }
+    $skillsDir = Join-Path (Join-Path $root ".agents") "skills"
   } else {
     $container = if ($Layout -eq "agents") { ".agents" } else { ".gemini" }
     if ($Scope -eq "workspace") {
@@ -82,6 +80,11 @@ try {
 
   Write-Output "Installed web-security-review to: $target"
   if ($HostName -eq "codex") {
+    if ($Scope -eq "workspace") {
+      Write-Output "Restart the Codex session or refresh skills if it is already open."
+    } else {
+      Write-Output "Restart the Codex app/session if the skill is not listed."
+    }
     Write-Output "Try: Use `$web-security-review for a quick security review of this repo."
   } else {
     Write-Output "Try in Gemini CLI: /skills reload"

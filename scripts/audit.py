@@ -252,19 +252,19 @@ def cmd_build(args: argparse.Namespace) -> int:
 def cmd_install(args: argparse.Namespace) -> int:
     host = args.host
     if host == "codex":
-        if args.scope != "user":
-            raise SystemExit("Codex installs only support user scope. Omit --scope or use --scope user.")
-        if args.workspace_root:
-            raise SystemExit("--workspace-root is only supported for Gemini workspace installs.")
         if args.layout is not None:
-            raise SystemExit("--layout is only supported for Gemini installs.")
+            raise SystemExit("--layout is only supported for Gemini installs. Codex workspace installs use .agents/skills.")
     workspace_root = pathlib.Path(args.workspace_root).expanduser().resolve() if args.workspace_root else None
     layout = args.layout or "native"
-    skills_dir = pathlib.Path(args.dest).expanduser().resolve() if args.dest else (
-        codex_home() / "skills"
-        if host == "codex"
-        else gemini_skills_dir(args.scope, layout, workspace_root=workspace_root)
-    )
+    if args.dest:
+        skills_dir = pathlib.Path(args.dest).expanduser().resolve()
+    elif host == "codex" and args.scope == "user":
+        skills_dir = codex_home() / "skills"
+    elif host == "codex":
+        root = workspace_root or pathlib.Path.cwd().resolve()
+        skills_dir = root / ".agents" / "skills"
+    else:
+        skills_dir = gemini_skills_dir(args.scope, layout, workspace_root=workspace_root)
     skills_dir.mkdir(parents=True, exist_ok=True)
 
     if args.artifact:
@@ -286,7 +286,10 @@ def cmd_install(args: argparse.Namespace) -> int:
     safe_extract(artifact_path, skills_dir)
     print(f"Installed web-security-review to: {install_target}")
     if host == "codex":
-        print("Try it in Codex with:")
+        if args.scope == "workspace":
+            print("Codex workspace install: restart the Codex session or refresh skills, then try:")
+        else:
+            print("Codex user install: restart the Codex app/session if the skill is not listed, then try:")
         print("  Use $web-security-review for a quick security review of this repo.")
         return 0
 
@@ -339,6 +342,7 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     print("  - ./wsr setup")
     print("  - ./wsr scan")
     print("  - python scripts/audit.py install")
+    print("  - python scripts/audit.py install --scope workspace --workspace-root .")
     print("  - python scripts/audit.py install --host gemini")
     print("  - python scripts/audit.py install --host gemini --layout agents")
     print("  - python scripts/audit.py install --host gemini --scope workspace")

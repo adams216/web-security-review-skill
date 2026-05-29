@@ -52,11 +52,6 @@ if [[ -f "$SCRIPT_DIR/scripts/audit.sh" ]]; then
   exec bash "$SCRIPT_DIR/scripts/audit.sh" "${args[@]}"
 fi
 
-if [[ "$HOST_NAME" == "codex" && "$SCOPE" != "user" ]]; then
-  echo "ERROR: Codex installs only support user scope." >&2
-  exit 1
-fi
-
 if ! command -v curl >/dev/null 2>&1; then
   echo "ERROR: curl is required for remote installation." >&2
   exit 1
@@ -79,8 +74,10 @@ curl -fsSL "https://github.com/adams216/web-security-review-skill/releases/lates
 
 if [[ -n "$DEST" ]]; then
   skills_dir="$DEST"
-elif [[ "$HOST_NAME" == "codex" ]]; then
+elif [[ "$HOST_NAME" == "codex" && "$SCOPE" == "user" ]]; then
   skills_dir="${CODEX_HOME:-$HOME/.codex}/skills"
+elif [[ "$HOST_NAME" == "codex" ]]; then
+  skills_dir="${WORKSPACE_ROOT:-$PWD}/.agents/skills"
 else
   container=".gemini"
   if [[ "$LAYOUT" == "agents" ]]; then
@@ -100,6 +97,11 @@ mv "$extract_root/web-security-review" "$skills_dir/web-security-review"
 
 echo "Installed web-security-review to: $skills_dir/web-security-review"
 if [[ "$HOST_NAME" == "codex" ]]; then
+  if [[ "$SCOPE" == "workspace" ]]; then
+    echo "Restart the Codex session or refresh skills if it is already open."
+  else
+    echo "Restart the Codex app/session if the skill is not listed."
+  fi
   echo 'Try: Use $web-security-review for a quick security review of this repo.'
 else
   echo "Try in Gemini CLI: /skills reload"

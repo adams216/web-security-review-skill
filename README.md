@@ -105,10 +105,22 @@ Use `.\wsr.ps1` instead of `./wsr` on Windows PowerShell.
 
 ### Codex
 
-Install:
+Install globally for your user:
 
 ```bash
 ./wsr install
+```
+
+Install into the current repo so Codex sees it as a project skill:
+
+```bash
+./wsr install --scope workspace --workspace-root .
+```
+
+Windows:
+
+```powershell
+.\wsr.ps1 install --scope workspace --workspace-root .
 ```
 
 Use in Codex:
@@ -117,6 +129,20 @@ Use in Codex:
 Use $web-security-review for a quick security review of this repo.
 Use $web-security-review for a full audit before release.
 Use $web-security-review in ai-agent mode with strict governance.
+```
+
+If Codex says the skill is not available, restart the Codex app/session after installing. For the Codex app, the most reliable path is the workspace install above because it places the skill at `.agents/skills/web-security-review` inside the project.
+
+Quick repair command for a repo where Codex cannot see the skill:
+
+```powershell
+.\wsr.ps1 install --scope workspace --workspace-root C:\path\to\your\repo
+```
+
+Then open a new Codex session in that repo and ask:
+
+```text
+Use $web-security-review for a quick security review of this repo.
 ```
 
 ### Gemini CLI

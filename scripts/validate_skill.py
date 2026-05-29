@@ -115,6 +115,21 @@ def main() -> int:
     installed_skill = BUILD_DIR / "test-codex-home" / "skills" / "web-security-review" / "SKILL.md"
     if not installed_skill.exists():
         raise SystemExit(f"Install shortcut did not create expected skill at: {installed_skill}")
+    codex_workspace_root = BUILD_DIR / "codex-workspace"
+    run(
+        [
+            sys.executable,
+            str(SCRIPTS_DIR / "audit.py"),
+            "install",
+            "--scope",
+            "workspace",
+            "--workspace-root",
+            str(codex_workspace_root),
+        ]
+    )
+    codex_workspace_skill = codex_workspace_root / ".agents" / "skills" / "web-security-review" / "SKILL.md"
+    if not codex_workspace_skill.exists():
+        raise SystemExit(f"Codex workspace install did not create expected skill at: {codex_workspace_skill}")
     gemini_user_dir = BUILD_DIR / "test-gemini-home" / ".gemini" / "skills"
     run(
         [
@@ -182,6 +197,25 @@ def main() -> int:
         ps_root_gemini_skill = ps_root_gemini_dir / "web-security-review" / "SKILL.md"
         if not ps_root_gemini_skill.exists():
             raise SystemExit(f"Root PowerShell Gemini install did not create expected skill at: {ps_root_gemini_skill}")
+        ps_codex_workspace_root = BUILD_DIR / "test-root-codex-workspace-ps"
+        run(
+            [
+                powershell,
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                str(ROOT / "install.ps1"),
+                "-Scope",
+                "workspace",
+                "-WorkspaceRoot",
+                str(ps_codex_workspace_root),
+            ]
+        )
+        ps_codex_workspace_skill = ps_codex_workspace_root / ".agents" / "skills" / "web-security-review" / "SKILL.md"
+        if not ps_codex_workspace_skill.exists():
+            raise SystemExit(
+                f"Root PowerShell Codex workspace install did not create expected skill at: {ps_codex_workspace_skill}"
+            )
         run([powershell, "-NoLogo", "-NoProfile", "-File", str(ROOT / "wsr.ps1"), "doctor"])
         ps_codex_dir = BUILD_DIR / "test-codex-home-ps" / "skills"
         run(
