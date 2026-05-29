@@ -15,6 +15,7 @@ The preferred internal model is:
 - `cryptography_assessment`
 - `security_headers`
 - `positive_findings`
+- `best_actions`
 - `remediation_roadmap`
 
 ## Required finding fields
@@ -46,13 +47,30 @@ Each finding should include:
 Render reports in this order:
 
 1. Executive summary
-2. Threat model summary
-3. Findings by severity
-4. Dependency and supply-chain review
-5. Cryptography assessment
-6. Security headers
-7. Positive findings
-8. Remediation roadmap
+2. Best actions
+3. Governance decision, when requested
+4. Threat model summary
+5. Findings by severity
+6. Dependency and supply-chain review
+7. Cryptography assessment
+8. Security headers
+9. Positive findings
+10. Remediation roadmap
+
+## Best actions section
+
+Every Markdown report should include `## Best Actions` near the top.
+
+Each action should include:
+
+- priority
+- action
+- why it matters
+- files or systems affected
+- suggested owner
+- verification step
+
+Keep the list focused on the highest-leverage work. Prefer 3 to 7 actions.
 
 ## SARIF mapping
 

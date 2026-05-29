@@ -105,6 +105,10 @@ Load these references only when needed:
 
 ## Reporting rules
 
+- In Codex app, Codex CLI, Claude Code, Gemini CLI, or any agent workspace, write a Markdown report file by default when the user asks for an audit or review.
+- Use `SECURITY_REPORT.md` for full/default audits, `SECURITY_QUICK.md` for quick scans, `SECURITY_CI.md` for CI reviews, `SECURITY_AGENT.md` for AI-agent reviews, and `SECURITY_FILE_<name>.md` for single-file reviews unless the user provides another output path.
+- After writing the report file, reply in chat with a short summary, the file path, and the top release-blocking actions.
+- Include a `Best Actions` section near the top of every Markdown report with the highest-leverage fixes in priority order.
 - Group findings by severity, then by file.
 - Prefer actionable, concrete language over generic advice.
 - Include interim mitigations when a full remediation is large.
@@ -147,6 +151,7 @@ Merge findings at the end and deduplicate by exploit path, not by syntax pattern
 
 ## Output expectations
 
-- For interactive use, return Markdown unless the caller asks for JSON.
+- For interactive agent use, create a detailed Markdown report file by default, then return a concise chat summary that links to the file.
+- Only provide chat-only output when the user explicitly asks not to write files or the environment is read-only.
 - For automation, prefer structured JSON and render Markdown or SARIF locally.
 - When a schema or exact field contract is supplied, follow it exactly.

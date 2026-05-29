@@ -1,7 +1,7 @@
 interface:
   display_name: "Web Security Review"
   short_description: "Audit web apps, AI agents, and MCP flows"
-  default_prompt: "Use $web-security-review to run a quick security review of this repo and tell me if anything should block release."
+  default_prompt: "Use $web-security-review to run a quick security review of this repo, write SECURITY_QUICK.md, and summarize the top actions."
 
 policy:
   allow_implicit_invocation: true

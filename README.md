@@ -131,6 +131,18 @@ Use $web-security-review for a full audit before release.
 Use $web-security-review in ai-agent mode with strict governance.
 ```
 
+Expected Codex app output:
+
+- A Markdown report file in the workspace, such as `SECURITY_QUICK.md`, `SECURITY_REPORT.md`, or `SECURITY_AGENT.md`.
+- A short chat summary with the report path and the highest-priority actions.
+- A `Best Actions` section near the top of the report with concrete fixes, owners, and verification steps.
+
+Most explicit prompt:
+
+```text
+Use $web-security-review for a full security audit of this repo. Write the detailed Markdown report to SECURITY_REPORT.md and include a Best Actions section with prioritized fixes.
+```
+
 If Codex says the skill is not available, restart the Codex app/session after installing. For the Codex app, the most reliable path is the workspace install above because it places the skill at `.agents/skills/web-security-review` inside the project.
 
 Quick repair command for a repo where Codex cannot see the skill:

@@ -65,7 +65,9 @@ suspected and explain the missing verification step.
 
 ## Output style
 
-- Prefer concise, structured output.
+- In an editable workspace, write a Markdown report file by default for audit/review requests, then summarize the result in chat.
+- Put `Best Actions` near the top of every Markdown report with prioritized, concrete next steps.
+- Prefer concise, structured chat output after the file is written.
 - Group findings by severity.
 - Use stable finding IDs when possible.
 - When producing machine-readable output, prefer normalized fields over prose.
